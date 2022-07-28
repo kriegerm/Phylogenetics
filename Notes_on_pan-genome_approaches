@@ -1,0 +1,107 @@
+#copied all the assemblies avaliable CHROMOSOME annotations form NCBI datasets for the 5 sp/subspecies nuclvi
+#moved them all into one directory 
+(base) kriegema@RNB10015 raw_fasta_files % cp */*/*/*/*.fna raw_fasta_files
+
+#PROKKA:
+had to run prokka --setupdb to get it to work because there was some wierd cat error
+
+#copied all the assemblies avaliable CHROMOSOME annotations form NCBI datasets for the 5 sp/subspecies nuclvi
+#moved them each into their own directory based on species/subsp
+#changed the names of the files os they made more sense
+(base) kriegema@RNB10015 raw_fasta_files % for k in *.fna; do var=$(head -1 $k); var2=${var// /_}; var3=${var2#?}; mv $k $var3; done
+#hand replaced the file extension to be .fasta because I was feeling lazy
+
+#extract out the strain info and then run prokka - you have to change the subspecies/species name for each directory this is run in
+for k in *.fasta; do strain1=${k##*vincentii_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir vincentii_"$strain".prokka.output --prefix vincentii_"$strain" --genus Fusobacterium --species nucleatum_vincentii --strain $strain --kingdom Bacteria --gcode 11; done
+
+for k in *.fasta; do strain1=${k##*periodonticum_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir periodonticum_"$strain".prokka.output --prefix periodonticum_"$strain" --genus Fusobacterium --species periodonticum --strain $strain --kingdom Bacteria --gcode 11; done
+
+for k in *.fasta; do strain1=${k##*nucleatum_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir nucleatum_"$strain".prokka.output --prefix nucleatum_"$strain" --genus Fusobacterium --species nucleatum_nucleatum --strain $strain --kingdom Bacteria --gcode 11; done
+
+for k in *.fasta; do strain1=${k##*animalis_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir animalis_"$strain".prokka.output --prefix animalis_"$strain" --genus Fusobacterium --species nucleatum_animalis --strain $strain --kingdom Bacteria --gcode 11; done
+
+for k in *.fasta; do strain1=${k##*polymorphum_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir polymorphum_"$strain".prokka.output --prefix polymorphum_"$strain" --genus Fusobacterium --species nucleatum_polymorphum --strain $strain --kingdom Bacteria --gcode 11; done
+
+##Copy all the gff files into one directory
+$ cp */*/*.gff ./prokka_gff
+
+#Run roary (from a screen) 
+$ roary -r -v -f ./roary_output_i90 ./prokka_gff/*.gff 
+$ roary -r -e -i 90 -v -f ./roary_output_i90_complete ./prokka_gff/*.gff #second run
+
+##I discovered a duplicate polymorphum genome during ANI analysis! polymorphum_genome_assembly_NCTC10562.gff Need to re-run roary without this prior ot publication in case that messes up the results, although it shouldn't (it's not on the tree)
+
+
+#FastTree - this command didn't work the first time, I had to re-type it out for whatever reason and then it worked. 
+FastTree –nt –gtr core_gene_alignment.aln > my_tree.newick
+
+
+#Roary-plots:
+#copied script from https://github.com/sanger-pathogens/Roary/blob/master/contrib/roary_plots/roary_plots.py
+roary_plots.py my_tree.newick gene_presence_absence.csv
+
+
+#raxml - I don't know what the -p flag means, but it won't let me run it without it. I also don't really understand what the -m flag is, but I tried my best from the tutorial to just copy/paste the aprox values. Update: the -p flag is just a random number generator I guess, so each time you run it you'll get a slightly different tree
+raxmlHPC -s core_gene_alignment.aln -n raxml_output -m GTRGAMMA -p 2352890
+###used this command for the i90_complete as well
+
+
+
+#query_pan_genome
+$query_pan_genome -a union ../prokka_gff/*.gff
+
+##############Ran same commands as above with ONLY the animalis gffs (9)
+
+
+##############FUSO SPECIES COMPARISON
+for k in *.fasta; do strain1=${k##*hwasookiii_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir hwasookiii_"$strain".prokka.output --prefix hwasookiii_"$strain" --genus Fusobacterium --species hwasookiii --strain $strain --kingdom Bacteria --gcode 11; done
+
+for k in *.fasta; do strain1=${k##*necrophorum_}; strain2=${strain1%%.fasta}; strain=${strain2%%_chromosome*}; 
+prokka $k --outdir necrophorum_"$strain".prokka.output --prefix necrophorum_"$strain" --genus Fusobacterium --species necrophorum --strain $strain --kingdom Bacteria --gcode 11; done
+
+#copy files as above, run roary as above
+
+
+##############STREP ANGINOSUS SPECIES COMPARISON
+
+
+
+##RUNNING ROARY AGAIN AS ABOVE, BUT WITHOUT PERIODONTICUM
+
+
+
+################################################################################################################################
+
+###PGAP - installed on exacloud
+Example 3: Gene prediction and annotation
+pgcgap --Annotate --scafPath ./all_genomes_fasta/ --Scaf_suffix .fasta --genus Fusobacterium --species nucleatum --codon 11 --threads 4
+
+#Analysis commands
+
+Example 12: Screening of contigs for antimicrobial and virulence genes.
+pgcgap --AntiRes --scafPath ./all_genomes_fasta/ --Scaf_suffix .fasta --threads 6 --db all --identity 75 --coverage 50
+
+Example 9: Genome and metagenome similarity estimation using MinHash.
+pgcgap --MASH --scafPath ./all_genomes_fasta/ --Scaf_suffix .fasta
+
+#Example 6 didn't give me any tree afiles for some reason, so trying this:
+pgcgap --CoreTree --CDsPath Results/Annotations/CDs --AAsPath Results/Annotations/AAs --codon 11 --strain_num 29 --threads 4 --bsnum 500
+
+Example 6: Conduct pan-genome analysis and construct a phylogenetic tree of single-copy core proteins called by Panaroo. Applicable to v1.0.35 and later.
+# Construct phylogenetic tree with FastTree (Quick without best fit model testing)
+pgcgap --Pan --codon 11 --identi 0.95 --strain_num 29 --threads 4 --GffPath Results/Annotations/GFF --fasttree
+
+Example 10: Run COG annotation for each strain.
+pgcgap --pCOG --threads 4 --strain_num 29 --id 40 --query_cover 70 --subject_cover 50 --AAsPath Results/Annotations/AAs
+
+
+
+
+
+
